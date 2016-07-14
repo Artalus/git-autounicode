@@ -1,83 +1,11 @@
 #!/bin/sh
-# will automatically start before applying commit and try to convert changed files to unicode
-# should be placed in .git/hooks/
-# NOTE: will fail when file is present in index (git add f) but deleted in working dir (rm f)
+# Should be put into <repository>/.git/hooks/
 
-endline="-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-"
+perl "pre-commit.pl"
 
-echo $endline
-echo " * Starting unicode check..."
-
-# turn off escaping non-ascii characters so тест.файл won't turn to "\321\202\320\265\321\201\321\202.\321\204\320\260\320\271\320\273"
-QP=$(git config --get core.quotepath)
-git config core.quotepath off
-
-# get files to process
-FILES=$(git diff --cached --name-only --diff-filter=ACMR)
-git config core.quotepath $QP
-
-# test if output is non whitespace
-if [[ -z "${FILES// }" ]]
+# if the execution of script returned error code, abort the commit
+if [[ $? > 0 ]]
 then
-	echo " * Nothing to check"
-	echo $endline 
-	exit
-fi
-
-
-let total=$(echo "$FILES" | grep -c '^') # "" are necessary for array to be presented one file per line
-let unicoded=0
-let i=0
-unicodedFiles=()
-IFS=$'\n' # to parse files with spaces in name
-
-for f in $FILES
-do	
-	let "i += 1"
-	echo "[$i/$total] --- Checking '$f' ---"
-	
-	if iconv -s -f utf-8 -t utf-8 "$f" > /dev/null # won't mess with already unicoded files
-	then
-		echo " * Conversion not needed"
-		continue
-	fi
-	
-	if iconv -c -f windows-1251 -t utf-8 "$f" > "$f.utf8"
-	then
-		rm "$f"
-		mv "$f.utf8" "$f"
-		let "unicoded += 1"
-		unicodedFiles+=($f)
-		echo " + Converted"
-	else
-		echo " x Couldn't convert, probably binary file"
-		rm "$f.utf8"
-	fi
-done
-
-echo "- - - - - - - - - - - - - - - - - - - - - - - - - - -"
-echo "Unicode check finished:  $i files checked"
-
-
-if [ $i -ne $total ]
-then
-	echo " ! ERROR: couldn't parse all $total files!"
-	echo " If this keeps happening, use 'git commit --no-verify' to surpass unicode check"
-	echo $endline 
+	echo "Commit aborted. You can use 'git commit --noverify' to skip this check."
 	exit 1
-fi
-
-
-if [ "$unicoded" -eq 0 ]
-then
-	echo " * Everything is OK"
-	echo $endline
-else
-	echo "Of them $unicoded with forced unicode:"
-	for f in $unicodedFiles; do
-		echo " - $f"
-	done
-	echo " * Commit aborted, check these files and then  'git add'  them again"
-	echo $endline
-	exit 1 # will prevent commit from succeed
 fi
