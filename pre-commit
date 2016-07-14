@@ -1,0 +1,27 @@
+#!/bin/sh
+# will automatically start before applying commit and try to convert changed files to unicode
+# should be placed in .git/hooks/
+
+for file in $(git diff --cached --name-only --diff-filter=ACMR)
+do
+	echo "--- Checking '$file' ---"
+	if iconv -s -f utf-8 -t utf-8 "$file" > /dev/null 
+	then
+        # additional check so the files already in UTF8 won't be messed
+		echo " * Conversion not needed"
+	else
+		echo " ~ Trying to convert..."
+		if iconv -c -f windows-1251 -t utf-8 "$file" > "$file.utf8"
+		then
+			rm "$file"
+			mv "$file.utf8" "$file"
+            # TODO: instead of silent add, remember the occasion and stop commit
+			git add "$file"
+			echo "  + Success"
+		else
+			echo "  x Failed"
+			rm "$file.utf8"
+		fi
+	fi
+done
+echo "Done"
