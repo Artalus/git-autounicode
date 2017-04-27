@@ -72,8 +72,27 @@ sub GetFiles
 	`git config core.quotepath off`;
 
 	# get files to process
-	my @diffFiles = `git diff --cached --name-only --diff-filter=ACMR`;
+	my @diffResult = `git diff --stat --cached --diff-filter=ACMR`;
 	`git config core.quotepath $QP`;
+	
+	
+	# skip last line "3 files changed, 1 insertion"
+	pop @diffResult;
+	
+	my @diffFiles = ();
+	
+	for $d (@diffResult)
+	{
+		# split each string by " | " in center
+		my @parts = split / \| /, $d;
+		
+		# skip binary files
+		if (not BeginsWith(Trim($parts[1]), 'Bin'))
+		{
+			push @diffFiles, Trim($parts[0]);
+		}
+	}
+	
 	return @diffFiles;
 }
 
@@ -119,3 +138,15 @@ sub ES
 {
 	print "- - - - - - - - - - - - - - - - - - - - - - - - - - -\n";
 }
+
+sub BeginsWith
+{
+    return substr($_[0], 0, length($_[1])) eq $_[1];
+}
+
+sub Trim
+{
+	my $s = shift;
+	$s =~ s/^\s+|\s+$//g;
+	return $s
+};
